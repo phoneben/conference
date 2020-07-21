@@ -2,6 +2,7 @@
 /*
 	FusionPBX
 	Version: MPL 1.1
+
 	The contents of this file are subject to the Mozilla Public License Version
 	1.1 (the "License"); you may not use this file except in compliance with
 	the License. You may obtain a copy of the License at
@@ -265,7 +266,7 @@
 	unset($sql);
 //get conference users
 	$sql = "select * from v_conference_users as e, v_users as u ";
-	$sql .= "whee e.user_uuid = u.user_uuid  ";
+	$sql .= "where e.user_uuid = u.user_uuid  ";
 	$sql .= "and u.user_enabled = 'true' ";
 	$sql .= "and e.domain_uuid = :domain_uuid ";
 	$sql .= "and e.conference_uuid = :conference_uuid ";
