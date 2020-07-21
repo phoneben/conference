@@ -2,33 +2,26 @@
 /*
 	FusionPBX
 	Version: MPL 1.1
-
 	The contents of this file are subject to the Mozilla Public License Version
 	1.1 (the "License"); you may not use this file except in compliance with
 	the License. You may obtain a copy of the License at
 	http://www.mozilla.org/MPL/
-
 	Software distributed under the License is distributed on an "AS IS" basis,
 	WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
 	for the specific language governing rights and limitations under the
 	License.
-
 	The Original Code is FusionPBX
-
 	The Initial Developer of the Original Code is
 	Mark J Crane <markjcrane@fusionpbx.com>
 	Portions created by the Initial Developer are Copyright (C) 2008-2018
 	the Initial Developer. All Rights Reserved.
-
 	Contributor(s):
 	Mark J Crane <markjcrane@fusionpbx.com>
 */
-
 //includes
 	require_once "root.php";
 	require_once "resources/require.php";
 	require_once "resources/check_auth.php";
-
 //check permissions
 	if (permission_exists('conference_add') || permission_exists('conference_edit')) {
 		//access granted
@@ -37,11 +30,9 @@
 		echo "access denied";
 		exit;
 	}
-
 //add multi-lingual support
 	$language = new text;
 	$text = $language->get();
-
 //action add or update
 	if (is_uuid($_REQUEST["id"])) {
 		$action = "update";
@@ -50,84 +41,71 @@
 	else {
 		$action = "add";
 	}
-
 //get http post variables and set them to php variables
 	if (count($_POST) > 0) {
 		$dialplan_uuid = $_POST["dialplan_uuid"];
 		$conference_name = $_POST["conference_name"];
 		$conference_extension = $_POST["conference_extension"];
-		$conference_pin_number = $_POST["conference_pin_number"];
+		$conference_member_pin = $_POST["conference_member_pin"];
+		$conference_moderator_pin = $_POST["conference_moderator_pin"];
 		$conference_profile = $_POST["conference_profile"];
-		$conference_flags = $_POST["conference_flags"];
+		$conference_member_flags = $_POST["conference_member_flags"];
+		$conference_moderator_flags = $_POST["conference_moderator_flags"];
+		$conference_record = $_POST["conference_record"];
 		$conference_order = $_POST["conference_order"];
 		$conference_description = $_POST["conference_description"];
+		$conference_pin_enabled = $_POST["conference_pin_enabled"];
 		$conference_enabled = $_POST["conference_enabled"];
-
 		//sanitize the conference name
 		$conference_name = preg_replace("/[^A-Za-z0-9\- ]/", "", $conference_name);
 		//$conference_name = str_replace(" ", "-", $conference_name);
 	}
-
 //delete the user from the v_conference_users
 	if ($_GET["a"] == "delete" && permission_exists("conference_delete")) {
-
 		$user_uuid = $_REQUEST["user_uuid"];
 		$conference_uuid = $_REQUEST["id"];
-
 		$p = new permissions;
 		$p->add('conference_user_delete', 'temp');
-
 		$array['conference_users'][0]['domain_uuid'] = $_SESSION['domain_uuid'];
 		$array['conference_users'][0]['conference_uuid'] = $conference_uuid;
 		$array['conference_users'][0]['user_uuid'] = $user_uuid;
-
 		$database = new database;
 		$database->app_name = 'conferences';
 		$database->app_uuid = 'b81412e8-7253-91f4-e48e-42fc2c9a38d9';
 		$database->delete($array);
 		$response = $database->message;
 		unset($array);
-
 		$p->delete('conference_user_delete', 'temp');
-
 		message::add($text['confirm-delete']);
 		header("Location: conference_edit.php?id=".$conference_uuid);
 		exit;
 	}
-
 //add the user to the v_conference_users
 	if (is_uuid($_REQUEST["user_uuid"]) && is_uuid($_REQUEST["id"]) && $_GET["a"] != "delete") {
 		//set the variables
 			$user_uuid = $_REQUEST["user_uuid"];
 			$conference_uuid = $_REQUEST["id"];
-
 		//assign the user to the extension
 			$array['conference_users'][0]['conference_user_uuid'] = uuid();
 			$array['conference_users'][0]['domain_uuid'] = $_SESSION['domain_uuid'];
 			$array['conference_users'][0]['conference_uuid'] = $conference_uuid;
 			$array['conference_users'][0]['user_uuid'] = $user_uuid;
-
 			$p = new permissions;
 			$p->add('conference_user_add', 'temp');
-
 			$database = new database;
 			$database->app_name = 'conferences';
 			$database->app_uuid = 'b81412e8-7253-91f4-e48e-42fc2c9a38d9';
 			$database->save($array);
 			$response = $database->message;
 			unset($array);
-
 			$p->delete('conference_user_add', 'temp');
-
 		//send a message
 			message::add($text['confirm-add']);
 			header("Location: conference_edit.php?id=".urlencode($conference_uuid));
 			exit;
 	}
-
 //process http post variables
 	if (count($_POST) > 0 && strlen($_POST["persistformvar"]) == 0) {
-
 		//get the conference id
 			if ($action == "add") {
 				$conference_uuid = uuid();
@@ -136,7 +114,6 @@
 			if ($action == "update") {
 				$conference_uuid = $_POST["conference_uuid"];
 			}
-
 		//validate the token
 			$token = new token;
 			if (!$token->validate($_SERVER['PHP_SELF'])) {
@@ -144,13 +121,13 @@
 				header('Location: conferences.php');
 				exit;
 			}
-
 		//check for all required data
 			$msg = '';
 			//if (strlen($dialplan_uuid) == 0) { $msg .= "Please provide: Dialplan UUID<br>\n"; }
 			if (strlen($conference_name) == 0) { $msg .= "".$text['confirm-name']."<br>\n"; }
 			if (strlen($conference_extension) == 0) { $msg .= "".$text['confirm-extension']."<br>\n"; }
-			//if (strlen($conference_pin_number) == 0) { $msg .= "Please provide: Pin Number<br>\n"; }
+			if ($conference_pin_enabled == "true" && strlen($conference_member_pin) == 0) { $msg .= "Please provide: Member Pin<br>\n"; }
+			if ($conference_pin_enabled == "true" && strlen($conference_moderator_pin) == 0) { $msg .= "Please provide: Moderator Pin<br>\n"; }
 			if (strlen($conference_profile) == 0) { $msg .= "".$text['confirm-profile']."<br>\n"; }
 			//if (strlen($conference_flags) == 0) { $msg .= "Please provide: Flags<br>\n"; }
 			//if (strlen($conference_order) == 0) { $msg .= "Please provide: Order<br>\n"; }
@@ -169,34 +146,44 @@
 				require_once "resources/footer.php";
 				return;
 			}
-
 		//add or update the database
 			if ($_POST["persistformvar"] != "true") {
-
 				//update the conference extension
 					$array['conferences'][0]['domain_uuid'] = $_SESSION['domain_uuid'];
 					$array['conferences'][0]['conference_uuid'] = $conference_uuid;
 					$array['conferences'][0]['dialplan_uuid'] = $dialplan_uuid;
 					$array['conferences'][0]['conference_name'] = $conference_name;
 					$array['conferences'][0]['conference_extension'] = $conference_extension;
-					$array['conferences'][0]['conference_pin_number'] = $conference_pin_number;
+					$array['conferences'][0]['conference_member_pin'] = $conference_member_pin;
+					$array['conferences'][0]['conference_moderator_pin'] = $conference_moderator_pin;
 					$array['conferences'][0]['conference_profile'] = $conference_profile;
 					$array['conferences'][0]['conference_flags'] = $conference_flags;
+					$array['conferences'][0]['conference_member_flags'] = $conference_member_flags;
+					$array['conferences'][0]['conference_moderator_flags'] = $conference_moderator_flags;
+					$array['conferences'][0]['conference_record'] = $conference_record;
 					$array['conferences'][0]['conference_order'] = $conference_order;
 					$array['conferences'][0]['conference_description'] = $conference_description;
+					$array['conferences'][0]['conference_pin_enabled'] = $conference_pin_enabled;
 					$array['conferences'][0]['conference_enabled'] = $conference_enabled;
-
-				//conference pin number
-					$pin_number = (strlen($conference_pin_number) > 0) ? '+'.$conference_pin_number : '';
-
 				//build the xml
 					$dialplan_xml = "<extension name=\"".$conference_name."\" continue=\"\" uuid=\"".$dialplan_uuid."\">\n";
 					$dialplan_xml .= "	<condition field=\"destination_number\" expression=\"^".$conference_extension."$\">\n";
-					$dialplan_xml .= "		<action application=\"answer\" data=\"\"/>\n";
-					$dialplan_xml .= "		<action application=\"conference\" data=\"".$conference_uuid."@".$_SESSION['domain_name']."@default".$pin_number."+flags{'".$conference_flags."'}\"/>\n";
+					if ($conference_pin_enabled == "true") {
+						$dialplan_xml .= "		<action application=\"set\" data=\"member_flags=".$conference_member_flags."\" inline=\"true\"/>\n";
+						$dialplan_xml .= "		<action application=\"set\" data=\"moderator_flags=".$conference_moderator_flags."\" inline=\"true\"/>\n";
+						$dialplan_xml .= "		<action application=\"set\" data=\"member_pin=".$conference_member_pin."\" inline=\"true\"/>\n";
+						$dialplan_xml .= "		<action application=\"set\" data=\"moderator_pin=".$conference_moderator_pin."\" inline=\"true\"/>\n";
+						$dialplan_xml .= "		<action application=\"lua\" data=\"conference_pin_number.lua\"/>\n";
+						$dialplan_xml .= "		<action application=\"set\" data=\"flags=\${\${conference_member_type}_flags}\"/>\n";
+						$dialplan_xml .= "		<action application=\"answer\" data=\"\"/>\n";
+						$dialplan_xml .= "		<action application=\"conference\" data=\"".$conference_uuid."@".$_SESSION['domain_name']."@".$conference_profile."+flags{\${flags}}\"/>\n";
+					}
+					else {
+						$dialplan_xml .= "		<action application=\"answer\" data=\"\"/>\n";
+						$dialplan_xml .= "		<action application=\"conference\" data=\"".$conference_uuid."@".$_SESSION['domain_name']."@".$conference_profile."+flags{'".$conference_member_flags."'}\"/>\n";
+					}
 					$dialplan_xml .= "	</condition>\n";
 					$dialplan_xml .= "</extension>\n";
-
 				//update the conference dialplan
 					$array['dialplans'][0]['dialplan_uuid'] = $dialplan_uuid;
 					$array['dialplans'][0]['domain_uuid'] = $_SESSION['domain_uuid'];
@@ -208,21 +195,17 @@
 					$array['dialplans'][0]['dialplan_context'] = $_SESSION['context'];
 					$array['dialplans'][0]['dialplan_enabled'] = $conference_enabled;
 					$array['dialplans'][0]['dialplan_description'] = $conference_description;
-
 					$p = new permissions;
 					$p->add('dialplan_add', 'temp');
 					$p->add('dialplan_edit', 'temp');
-
 					$database = new database;
 					$database->app_name = 'conferences';
 					$database->app_uuid = 'b81412e8-7253-91f4-e48e-42fc2c9a38d9';
 					$database->save($array);
 					$response = $database->message;
 					unset($array);
-
 					$p->delete('dialplan_add', 'temp');
 					$p->delete('dialplan_edit', 'temp');
-
 				//delete the dialplan details
 					$sql = "delete from v_dialplan_details ";
 					$sql .= "where dialplan_uuid = :dialplan_uuid ";
@@ -232,24 +215,18 @@
 					$database = new database;
 					$database->execute($sql, $parameters);
 					unset($sql, $parameters);
-
 				//add the message
 					message::add($text['confirm-update']);
-
 				//apply settings reminder
 					$_SESSION["reload_xml"] = true;
-
 				//clear the cache
 					$cache = new cache;
 					$cache->delete("dialplan:".$_SESSION["context"]);
-
 				//redirect the browser
-					header("Location: conferences.php");
+					header("Location: conference_edit.php?id=".urlencode($conference_uuid));
 					exit;
-
 			}
 	}
-
 //pre-populate the form
 	if (count($_GET) > 0 && $_POST["persistformvar"] != "true") {
 		$conference_uuid = $_GET["id"];
@@ -264,17 +241,20 @@
 			$dialplan_uuid = $row["dialplan_uuid"];
 			$conference_name = $row["conference_name"];
 			$conference_extension = $row["conference_extension"];
-			$conference_pin_number = $row["conference_pin_number"];
+			$conference_member_pin = $row["conference_member_pin"];
+			$conference_moderator_pin = $row["conference_moderator_pin"];
 			$conference_profile = $row["conference_profile"];
-			$conference_flags = $row["conference_flags"];
+			$conference_member_flags = $row["conference_member_flags"];
+			$conference_moderator_flags = $row["conference_moderator_flags"];
+			$conference_record = $row["conference_record"];
 			$conference_order = $row["conference_order"];
 			$conference_description = $row["conference_description"];
+			$conference_pin_enabled = $row["conference_pin_enabled"];
 			$conference_enabled = $row["conference_enabled"];
 			$conference_name = str_replace("-", " ", $conference_name);
 		}
 		unset($sql, $parameters, $row);
 	}
-
 //get the conference profiles
 	$sql = "select * ";
 	$sql .= "from v_conference_profiles ";
@@ -283,10 +263,9 @@
 	$database = new database;
 	$conference_profiles = $database->select($sql, null, 'all');
 	unset($sql);
-
 //get conference users
 	$sql = "select * from v_conference_users as e, v_users as u ";
-	$sql .= "where e.user_uuid = u.user_uuid  ";
+	$sql .= "whee e.user_uuid = u.user_uuid  ";
 	$sql .= "and u.user_enabled = 'true' ";
 	$sql .= "and e.domain_uuid = :domain_uuid ";
 	$sql .= "and e.conference_uuid = :conference_uuid ";
@@ -295,7 +274,6 @@
 	$database = new database;
 	$conference_users = $database->select($sql, $parameters, 'all');
 	unset($sql, $parameters);
-
 //get the users
 	$sql = "select * from v_users ";
 	$sql .= "where domain_uuid = :domain_uuid ";
@@ -304,21 +282,17 @@
 	$database = new database;
 	$users = $database->select($sql, $parameters, 'all');
 	unset($sql, $parameters);
-
 //set the default
 	if ($conference_profile == "") { $conference_profile = "default"; }
-
+	$conference_moderator_flags = "moderator|" . preg_replace("{moderator\|?}","", $conference_moderator_flags);
 //create token
 	$object = new token;
 	$token = $object->create($_SERVER['PHP_SELF']);
-
 //show the header
 	$document['title'] = $text['title-conference'];
 	require_once "resources/header.php";
-
 //show the content
 	echo "<form method='post' name='frm' id='frm'>\n";
-
 	echo "<div class='action_bar' id='action_bar'>\n";
 	echo "	<div class='heading'>";
 	if ($action == "add") {
@@ -337,12 +311,9 @@
 	echo "	</div>\n";
 	echo "	<div style='clear: both;'></div>\n";
 	echo "</div>\n";
-
 	echo $text['description']."\n";
 	echo "<br /><br />\n";
-
 	echo "<table width='100%' border='0' cellpadding='0' cellspacing='0'>\n";
-
 	echo "<tr>\n";
 	echo "<td width='30%' class='vncellreq' valign='top' align='left' nowrap='nowrap'>\n";
 	echo "	".$text['label-name']."\n";
@@ -353,7 +324,6 @@
 	echo "".$text['description-name']."\n";
 	echo "</td>\n";
 	echo "</tr>\n";
-
 	echo "<tr>\n";
 	echo "<td class='vncellreq' valign='top' align='left' nowrap='nowrap'>\n";
 	echo "	".$text['label-extension']."\n";
@@ -364,24 +334,11 @@
 	echo "".$text['description-extension']."\n";
 	echo "</td>\n";
 	echo "</tr>\n";
-
-	echo "<tr>\n";
-	echo "<td class='vncell' valign='top' align='left' nowrap='nowrap'>\n";
-	echo "	".$text['label-pin']."\n";
-	echo "</td>\n";
-	echo "<td class='vtable' align='left'>\n";
-	echo "	<input class='formfld' type='text' name='conference_pin_number' maxlength='255' value=\"".escape($conference_pin_number)."\">\n";
-	echo "<br />\n";
-	echo "".$text['description-pin']."\n";
-	echo "</td>\n";
-	echo "</tr>\n";
-
 	if (permission_exists('conference_user_add') || permission_exists('conference_user_edit')) {
 		if ($action == "update") {
 			echo "	<tr>";
 			echo "		<td class='vncell' valign='top'>".$text['label-user_list']."</td>";
 			echo "		<td class='vtable'>";
-
 			if (is_array($conference_users) && @sizeof($conference_users) != 0) {
 				echo "		<table width='50%'>\n";
 				foreach ($conference_users as $field) {
@@ -395,7 +352,6 @@
 				echo "		</table>\n";
 				echo "		<br />\n";
 			}
-
 			echo "			<select name=\"user_uuid\" class='formfld'>\n";
 			echo "			<option value=\"\"></option>\n";
 			foreach ($users as $field) {
@@ -403,7 +359,6 @@
 			}
 			echo "			</select>";
 			echo button::create(['type'=>'submit','label'=>$text['button-add'],'icon'=>$_SESSION['theme']['button_icon_add']]);
-
 			echo "			<br>\n";
 			echo "			".$text['description-user-add']."\n";
 			echo "			<br />\n";
@@ -411,10 +366,9 @@
 			echo "	</tr>";
 		}
 	}
-
 	echo "<tr>\n";
 	echo "<td class='vncellreq' valign='top' align='left' nowrap='nowrap'>\n";
-	echo "	".$text['table-profile']."\n";
+	echo "	".$text['label-profile']."\n";
 	echo "</td>\n";
 	echo "<td class='vtable' align='left'>\n";
 	echo "	<select class='formfld' name='conference_profile'>\n";
@@ -431,18 +385,69 @@
 	echo "".$text['description-profile']."\n";
 	echo "</td>\n";
 	echo "</tr>\n";
-
 	echo "<tr>\n";
 	echo "<td class='vncell' valign='top' align='left' nowrap='nowrap'>\n";
-	echo "	".$text['label-flags']."\n";
+	echo "	".$text['label-member_pin']."\n";
 	echo "</td>\n";
 	echo "<td class='vtable' align='left'>\n";
-	echo "	<input class='formfld' type='text' name='conference_flags' maxlength='255' value=\"".escape($conference_flags)."\">\n";
+	echo "	<input class='formfld' type='text' name='conference_member_pin' maxlength='255' value=\"".escape($conference_member_pin)."\">\n";
 	echo "<br />\n";
-	echo "".$text['description-flags']."\n";
+	echo "".$text['description-member_pin']."\n";
 	echo "</td>\n";
 	echo "</tr>\n";
-
+	echo "<tr>\n";
+	echo "<td class='vncell' valign='top' align='left' nowrap='nowrap'>\n";
+	echo "	".$text['label-moderator_pin']."\n";
+	echo "</td>\n";
+	echo "<td class='vtable' align='left'>\n";
+	echo "	<input class='formfld' type='text' name='conference_moderaror_pin' maxlength='255' value=\"".escape($conference_moderator_pin)."\">\n";
+	echo "<br />\n";
+	echo "".$text['description-moderator_pin']."\n";
+	echo "</td>\n";
+	echo "</tr>\n";
+	echo "<tr>\n";
+	echo "<td class='vncell' valign='top' align='left' nowrap='nowrap'>\n";
+	echo "	".$text['label-member_flags']."\n";
+	echo "</td>\n";
+	echo "<td class='vtable' align='left'>\n";
+	echo "	<input class='formfld' type='text' name='conference_member_flags' maxlength='255' value=\"".escape($conference_member_flags)."\">\n";
+	echo "<br />\n";
+	echo "".$text['description-member_flags']."\n";
+	echo "</td>\n";
+	echo "</tr>\n";
+	echo "<tr>\n";
+	echo "<td class='vncell' valign='top' align='left' nowrap='nowrap'>\n";
+	echo "	".$text['label-moderator_flags']."\n";
+	echo "</td>\n";
+	echo "<td class='vtable' align='left'>\n";
+	echo "	<input class='formfld' type='text' name='conference_moderator_flags' maxlength='255' value=\"".escape($conference_moderator_flags)."\">\n";
+	echo "<br />\n";
+	echo "".$text['description-moderator_flags']."\n";
+	echo "</td>\n";
+	echo "</tr>\n";
+	if (permission_exists('conference_record')) {
+		echo "<tr>\n";
+		echo "<td class='vncell' valign='top' align='left' nowrap='nowrap'>".$text['label-record']."</td>\n";
+		echo "<td class='vtable' align='left'>\n";
+		echo "	<select class='formfld' name='conference_record'>\n";
+		echo "	<option value=''></option>\n";
+		if ($conference_record == "true") {
+			echo "	<option value='true' selected='selected'>".$text['label-true']."</option>\n";
+		}
+		else {
+			echo "	<option value='true'>".$text['label-true']."</option>\n";
+		}
+		if ($conference_record == "false") {
+			echo "	<option value='false' selected='selected'>".$text['label-false']."</option>\n";
+		}
+		else {
+			echo "	<option value='false'>".$text['label-false']."</option>\n";
+		}
+		echo "	</select>\n";
+		echo "<br />\n";
+		echo "</td>\n";
+		echo "</tr>\n";
+	}
 	echo "<tr>\n";
 	echo "<td class='vncell' valign='top' align='left' nowrap='nowrap'>\n";
 	echo "	".$text['label-order']."\n";
@@ -464,10 +469,22 @@
 	echo "".$text['description-order']."\n";
 	echo "</td>\n";
 	echo "</tr>\n";
-
+	echo "<tr>\n";
+	echo "<td class='vncell' valign='top' align='left' nowrap='nowrap'>\n";
+	echo "	".$text['label-pin_enabled']."\n";
+	echo "</td>\n";
+	echo "<td class='vtable' align='left'>\n";
+	echo "	<select class='formfld' name='conference_pin_enabled'>\n";
+	echo "		<option value='true'>".$text['label-true']."</option>\n";
+	echo "		<option value='false' ".($conference_pin_enabled == 'false' ? "selected='selected'" : null).">".$text['label-false']."</option>\n";
+	echo "	</select>\n";
+	echo "<br />\n";
+	echo "".$text['description-conference_pin_enable']."\n";
+	echo "</td>\n";
+	echo "</tr>\n";
 	echo "<tr>\n";
 	echo "<td class='vncellreq' valign='top' align='left' nowrap='nowrap'>\n";
-	echo "	".$text['table-enabled']."\n";
+	echo "	".$text['label-enabled']."\n";
 	echo "</td>\n";
 	echo "<td class='vtable' align='left'>\n";
 	echo "	<select class='formfld' name='conference_enabled'>\n";
@@ -478,7 +495,6 @@
 	echo "".$text['description-conference-enable']."\n";
 	echo "</td>\n";
 	echo "</tr>\n";
-
 	echo "<tr>\n";
 	echo "<td class='vncell' valign='top' align='left' nowrap='nowrap'>\n";
 	echo "	".$text['label-description']."\n";
@@ -489,19 +505,14 @@
 	echo "".$text['description-info']."\n";
 	echo "</td>\n";
 	echo "</tr>\n";
-
 	echo "</table>";
 	echo "<br><br>";
-
 	if ($action == "update") {
 		echo "<input type='hidden' name='dialplan_uuid' value='".escape($dialplan_uuid)."'>\n";
 		echo "<input type='hidden' name='conference_uuid' value='".escape($conference_uuid)."'>\n";
 	}
 	echo "<input type='hidden' name='".$token['name']."' value='".$token['hash']."'>\n";
-
 	echo "</form>";
-
 //include the footer
 	require_once "resources/footer.php";
-
 ?>
