@@ -197,7 +197,9 @@
 	$num_rows = $conference_center->room_count();
 
 //prepare to page the results
-	$rows_per_page = ($_SESSION['domain']['paging']['numeric'] != '') ? $_SESSION['domain']['paging']['numeric'] : 200;
+
+	$rows_per_page = ($_SESSION['domain']['paging']['numeric'] != '') ? $_SESSION['domain']['paging']['numeric'] : 50;
+
 	$param = $search ? "&search=".$search : null;
 	if (isset($_GET['page'])) {
 		$page = is_numeric($_GET['page']) ? $_GET['page'] : 0;
